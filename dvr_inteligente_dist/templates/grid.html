@@ -1,0 +1,72 @@
+{{if .Cameras}}
+    <div class="w-full h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+        {{range .Cameras}}
+        <div class="cam-card rounded-2xl overflow-hidden flex flex-col group relative">
+            
+            <!-- Overlay status -->
+            <div class="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center space-x-2 z-10 border border-white/10">
+                <div class="w-2.5 h-2.5 bg-red-500 rounded-full pulsing-dot"></div>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Câmera 0{{.ID}}</span>
+            </div>
+            
+            <!-- Vídeo Stream (MJPEG) -->
+            <div class="relative w-full pt-[56.25%] bg-black cursor-pointer group-hover:opacity-90 transition-opacity" onclick="openModal('/stream/{{.ID}}', 'Câmera 0{{.ID}}')"> 
+                <img src="/stream/{{.ID}}" 
+                     class="absolute top-0 left-0 w-full h-full object-cover"
+                     alt="Stream da Câmera {{.ID}}"
+                     onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\' fill=\'white\'><text x=\'50\' y=\'50\' font-family=\'Arial\' font-size=\'10\' text-anchor=\'middle\' dominant-baseline=\'middle\'>Sem Sinal</text></svg>'" />
+                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity">
+                    <svg class="w-12 h-12 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-slate-800/50 flex flex-col space-y-3 border-t border-slate-700/50">
+                <div class="flex justify-between items-center w-full">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span class="text-sm font-medium text-slate-300">Ao Vivo</span>
+                    </div>
+                    <select 
+                        hx-post="/api/cameras/resolution?id={{.ID}}" 
+                        name="res"
+                        hx-swap="none"
+                        class="bg-slate-700 text-xs text-white border border-slate-600 rounded-md px-2 py-1 outline-none focus:border-indigo-500 cursor-pointer">
+                        <option value="1080p" {{if eq .Res "1080p"}}selected{{end}}>1080p (FHD)</option>
+                        <option value="720p" {{if eq .Res "720p"}}selected{{end}}>720p (HD)</option>
+                        <option value="480p" {{if eq .Res "480p"}}selected{{end}}>480p (Econômico)</option>
+                    </select>
+                </div>
+                <div class="flex space-x-2 justify-between w-full">
+                    <button 
+                        hx-post="/api/cameras/motion?id={{.ID}}" 
+                        hx-swap="innerHTML"
+                        class="text-xs font-semibold px-2 py-1.5 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white transition-colors" title="Vigiar Movimento">
+                        🏃
+                    </button>
+                    <button 
+                        hx-post="/api/cameras/record?id={{.ID}}" 
+                        hx-swap="innerHTML"
+                        class="text-xs font-semibold px-2 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-white transition-colors" title="Gravar 5s">
+                        🔴
+                    </button>
+                    <a href="/api/cameras/photo?id={{.ID}}" download class="flex items-center text-xs font-semibold px-2 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 transition-colors" title="Tirar Foto">
+                        📸
+                    </a>
+                    <button 
+                        hx-get="/api/cameras/toggle?id={{.ID}}" 
+                        hx-swap="innerHTML"
+                        class="text-xs font-semibold px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 transition-colors w-full">
+                        Pausar
+                    </button>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+{{else}}
+    <div class="text-slate-500 flex flex-col items-center">
+        <svg class="w-16 h-16 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        <span class="text-lg">Nenhuma câmera USB detectada.</span>
+        <span class="text-sm mt-2 opacity-70">Verifique a conexão e os drivers do dispositivo.</span>
+    </div>
+{{end}}

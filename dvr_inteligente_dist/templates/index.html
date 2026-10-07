@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Stream Go</title>
+    <!-- HTMX para comunicação fluida -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- HTMX SSE Extension -->
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <!-- TailwindCSS via CDN para design premium/responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+        }
+        .cam-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .cam-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .pulsing-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-10 flex justify-between items-center">
+            <div>
+                <h1 class="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                    Centro de Controle USB
+                </h1>
+                <p class="text-slate-400 mt-2">Monitoramento inteligente com detecção de movimento em tempo real</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button hx-get="/api/gallery" hx-target="body" hx-swap="beforeend" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-4 rounded-lg font-medium transition-colors shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <span>Galeria</span>
+                </button>
+                <div class="flex items-center space-x-2 bg-slate-800 py-2 px-4 rounded-full border border-slate-700">
+                    <div class="w-3 h-3 bg-emerald-500 rounded-full pulsing-dot"></div>
+                    <span class="text-sm text-slate-300 font-medium">Sistema Online</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Container de Alertas (SSE) -->
+        <div id="alert-container" hx-ext="sse" sse-connect="/api/events" sse-swap="MotionAlert" hx-swap="beforeend" class="fixed bottom-4 right-4 z-50 w-96 max-w-[90vw] flex flex-col items-end pointer-events-none">
+            <!-- Eventos SSE cairão aqui -->
+        </div>
+
+        <!-- O Grid de Câmeras. Atualiza automaticamente a cada 5 segundos -->
+        <main 
+            id="camera-grid-container" 
+            hx-get="/api/cameras/grid" 
+            hx-trigger="load, every 5s"
+            hx-swap="innerHTML"
+            class="min-h-[400px] flex items-center justify-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50">
+            
+            <div class="text-slate-500 flex flex-col items-center animate-pulse">
+                <svg class="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                <span>Buscando câmeras USB conectadas...</span>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal de Visualização Maximizada -->
+    <div id="camera-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div class="relative w-11/12 max-w-6xl bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-900/80">
+                <h3 id="modal-title" class="text-xl font-bold text-slate-200">Câmera Maximizada</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-red-500/80 p-2 rounded-lg transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="relative w-full bg-black flex-1 min-h-[50vh] overflow-hidden group" id="modal-container">
+                <img id="modal-img" src="" class="absolute inset-0 w-full h-full object-contain cursor-crosshair transition-transform duration-100 origin-center" alt="Stream Maximizada" draggable="false" />
+                
+                <!-- Div do Desenho do ROI -->
+                <div id="roi-box" class="absolute border-2 border-red-500 bg-red-500/20 hidden pointer-events-none"></div>
+
+                <div class="absolute bottom-4 left-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button id="btn-draw-roi" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold shadow-lg">
+                        Desenhar Zona
+                    </button>
+                    <button id="btn-save-roi" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold shadow-lg hidden">
+                        Salvar Zona
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('camera-modal');
+        const modalImg = document.getElementById('modal-img');
+        const modalTitle = document.getElementById('modal-title');
+
+        let scale = 1;
+        let panning = false;
+        let pointX = 0;
+        let pointY = 0;
+        let startX = 0;
+        let startY = 0;
+
+        function setTransform() {
+            modalImg.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+        }
+
+        function resetTransform() {
+            scale = 1;
+            pointX = 0;
+            pointY = 0;
+            setTransform();
+        }
+
+        function openModal(streamUrl, title) {
+            resetTransform();
+            modalImg.src = streamUrl;
+            modalTitle.innerText = title;
+            modal.classList.remove('hidden');
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            modal.classList.add('opacity-100');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0');
+            drawingROI = false;
+            btnSaveROI.classList.add('hidden');
+            roiBox.classList.add('hidden');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modalImg.src = '';
+                document.body.style.overflow = 'auto';
+            }, 300);
+        }
+
+        // --- Lógica ROI ---
+        const roiBox = document.getElementById('roi-box');
+        const btnDrawROI = document.getElementById('btn-draw-roi');
+        const btnSaveROI = document.getElementById('btn-save-roi');
+        
+        let drawingROI = false;
+        let isDrawing = false;
+        let rectStart = {x: 0, y: 0};
+        let currentCamId = "";
+
+        btnDrawROI.addEventListener('click', () => {
+            drawingROI = !drawingROI;
+            if (drawingROI) {
+                resetTransform();
+                btnDrawROI.classList.replace('bg-indigo-600', 'bg-red-600');
+                btnDrawROI.innerText = 'Cancelar Zona';
+                modalImg.style.cursor = 'crosshair';
+                roiBox.classList.remove('hidden');
+            } else {
+                btnDrawROI.classList.replace('bg-red-600', 'bg-indigo-600');
+                btnDrawROI.innerText = 'Desenhar Zona';
+                btnSaveROI.classList.add('hidden');
+                roiBox.classList.add('hidden');
+            }
+        });
+
+        modalImg.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (drawingROI) {
+                isDrawing = true;
+                const rect = modalImg.getBoundingClientRect();
+                rectStart.x = e.clientX - rect.left;
+                rectStart.y = e.clientY - rect.top;
+                
+                roiBox.style.left = rectStart.x + 'px';
+                roiBox.style.top = rectStart.y + 'px';
+                roiBox.style.width = '0px';
+                roiBox.style.height = '0px';
+                btnSaveROI.classList.add('hidden');
+            } else {
+                panning = true;
+                startX = e.clientX - pointX;
+                startY = e.clientY - pointY;
+                modalImg.style.cursor = 'grabbing';
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isDrawing) {
+                isDrawing = false;
+                if (parseInt(roiBox.style.width) > 20) {
+                    btnSaveROI.classList.remove('hidden');
+                }
+            }
+            if (panning) {
+                panning = false;
+                modalImg.style.cursor = drawingROI ? 'crosshair' : 'move';
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            e.preventDefault();
+            if (isDrawing) {
+                const rect = modalImg.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+                
+                const width = Math.abs(currentX - rectStart.x);
+                const height = Math.abs(currentY - rectStart.y);
+                const left = Math.min(currentX, rectStart.x);
+                const top = Math.min(currentY, rectStart.y);
+                
+                roiBox.style.width = width + 'px';
+                roiBox.style.height = height + 'px';
+                roiBox.style.left = left + 'px';
+                roiBox.style.top = top + 'px';
+            } else if (panning) {
+                pointX = (e.clientX - startX);
+                pointY = (e.clientY - startY);
+                setTransform();
+            }
+        });
+
+        btnSaveROI.addEventListener('click', () => {
+            const rect = modalImg.getBoundingClientRect();
+            // Normaliza (0.0 a 1.0) baseado no display width/height atual da tag img
+            const x = parseFloat(roiBox.style.left) / rect.width;
+            const y = parseFloat(roiBox.style.top) / rect.height;
+            const w = parseFloat(roiBox.style.width) / rect.width;
+            const h = parseFloat(roiBox.style.height) / rect.height;
+            
+            // Extrai ID da Câmera do modal title ou streamUrl
+            const camId = modalTitle.innerText.replace(/[^\d]/g, '');
+
+            const formData = new FormData();
+            formData.append('x', x);
+            formData.append('y', y);
+            formData.append('w', w);
+            formData.append('h', h);
+
+            fetch('/api/cameras/roi?id=' + camId, {
+                method: 'POST',
+                body: formData
+            }).then(() => {
+                btnDrawROI.click(); // Cancela modo de desenho para voltar ao normal
+                alert("Zona salva com sucesso! Pode ativar a vigilância.");
+            });
+        });
+
+        modalImg.addEventListener('wheel', (e) => {
+            if (drawingROI) return;
+            e.preventDefault();
+            const delta = e.deltaY * -0.001;
+            const newScale = Math.min(Math.max(1, scale + delta), 5); // Limite min 1x, max 5x
+            scale = newScale;
+            setTransform();
+        });
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.id === 'modal-container') closeModal();
+        });
+        
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+        });
+    </script>
+</body>
+</html>
