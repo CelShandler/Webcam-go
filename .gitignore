@@ -23,3 +23,10 @@ go.work.sum
 
 # env file
 .env
+
+# Arquivos de Distribuicao
+dvr_inteligente_dist.zip
+dvr_inteligente_dist/
+
+# Arquivos de Captura
+capturas/
