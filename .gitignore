@@ -27,6 +27,8 @@ go.work.sum
 # Arquivos de Distribuicao
 dvr_inteligente_dist.zip
 dvr_inteligente_dist/
+dvr_inteligente_dist/templates/
+dvr_inteligente_dist/static/
 
 # Arquivos de Captura
 capturas/
